@@ -10,7 +10,9 @@ Everything runs on your machine. No cloud APIs. No data leaves your laptop. Appl
 
 ## What it does
 
-Drop one or more documents into `data/`, run two scripts, then ask questions about them:
+Drop one or more documents into `data/`, run two scripts, then ask questions about them.
+
+In the example below, the document indexed in `data/` is a public technical report on hydrogen-production electrolyzers — *Electrolyzers for Hydrogen Production: Technical and Economic Characteristics* — and that is what "the report" refers to in the answer:
 
 ```bash
 $ python scripts/ask.py "What are the main types of electrolyzers covered in the report?"
