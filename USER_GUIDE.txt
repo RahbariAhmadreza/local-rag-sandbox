@@ -1,0 +1,317 @@
+================================================================================
+LOCAL RAG SANDBOX — USER GUIDE (SETUP FROM SCRATCH)
+================================================================================
+
+Goal:
+    A local, offline-first Retrieval-Augmented Generation (RAG) sandbox for
+    asking grounded questions over your own internal documents — PDFs, text
+    files, document collections, or databases.
+
+    The first example use case implemented in this repo is a RAG assistant
+    over a public energy-transition report. The architecture is fully
+    general: swap the source documents, prompt, and models, and the same
+    pipeline serves legal contracts, internal policy documents, research
+    archives, codebases, support tickets, or any other text corpus.
+
+Status of this guide:
+    This is the WORKING DRAFT of the eventual README.md. It documents every
+    step actually performed during the initial setup session, so any user
+    (including future you on another machine) can reproduce the environment
+    end-to-end.
+
+    When the project reaches a stable Version 1 milestone, this file will be
+    converted into README.md.
+
+--------------------------------------------------------------------------------
+0. TARGET MACHINE
+--------------------------------------------------------------------------------
+
+Verified on:
+    MacBook Pro, Apple M3 Pro, 18 GB unified memory, macOS (zsh shell).
+
+The instructions should work on any Apple-Silicon Mac with similar specs.
+For Intel Macs or Linux, model-pull commands are identical, but the Ollama
+install step differs.
+
+--------------------------------------------------------------------------------
+1. PREREQUISITES
+--------------------------------------------------------------------------------
+
+Before starting, you need three things installed system-wide:
+
+    a) Homebrew                  https://brew.sh
+       Used to install Ollama.
+
+    b) Anaconda or Miniconda     https://www.anaconda.com/download
+       Used to manage the Python environment. (Alternatively, the built-in
+       python3 -m venv works equally well — see step 3 alternative.)
+
+    c) A terminal                Terminal.app, iTerm2, or your preferred shell.
+
+Verify each one is installed:
+
+    brew --version
+    conda --version
+
+If either command says "command not found", install it from the link above
+before proceeding.
+
+--------------------------------------------------------------------------------
+2. CLONE OR CREATE THE PROJECT FOLDER
+--------------------------------------------------------------------------------
+
+If cloning from a public repository (future state):
+
+    git clone <repo-url> local-rag-sandbox
+    cd local-rag-sandbox
+
+If starting from scratch (what was actually done in this session):
+
+    mkdir -p local-rag-sandbox/data \
+             local-rag-sandbox/scripts \
+             local-rag-sandbox/chroma_db \
+             local-rag-sandbox/eval
+    cd local-rag-sandbox
+
+Expected folder structure:
+
+    local-rag-sandbox/
+    ├── src/
+    │   └── local_rag_sandbox/    (importable Python package: config, prompts, ...)
+    │       ├── __init__.py
+    │       ├── config.py         (paths, model names, collection name)
+    │       └── prompts.py        (RAG prompt template)
+    ├── scripts/                  (thin executable entry points)
+    │   ├── test_ollama.py
+    │   ├── ingest.py
+    │   └── ask.py
+    ├── tests/                    (pytest test suite)
+    │   ├── __init__.py
+    │   └── test_smoke.py
+    ├── data/                     (place your PDFs here, gitignored)
+    ├── chroma_db/                (vector DB; auto-populated by ingest script)
+    ├── eval/                     (optional evaluation questions)
+    ├── pyproject.toml            (package metadata, dev deps, tool config)
+    ├── requirements.txt          (pinned dependency snapshot)
+    ├── .gitignore
+    └── README.md                 (this file, once finalised)
+
+--------------------------------------------------------------------------------
+3. CREATE THE PYTHON ENVIRONMENT
+--------------------------------------------------------------------------------
+
+This project was developed using a conda environment named `local-rag-sandbox`
+running Python 3.11.
+
+Recommended path — conda:
+
+    conda create -n local-rag-sandbox python=3.11 -y
+    conda activate local-rag-sandbox
+
+After activation, your shell prompt should be prefixed with:
+
+    (local-rag-sandbox) $
+
+Alternative path — Python's built-in venv (no conda needed):
+
+    python3 -m venv venv
+    source venv/bin/activate
+
+The rest of this guide works identically with either choice, because
+requirements.txt is environment-agnostic.
+
+--------------------------------------------------------------------------------
+4. INSTALL PYTHON PACKAGES
+--------------------------------------------------------------------------------
+
+Two paths — pick one.
+
+Path A (recommended — reproducible, uses pinned versions from this project):
+
+    pip install -r requirements.txt
+
+Path B (fresh install — resolves to the latest compatible versions of each
+package today; useful if requirements.txt is missing or out of date):
+
+    pip install langchain langchain-community langchain-ollama \
+                langchain-chroma chromadb pypdf
+
+Then snapshot:
+
+    pip freeze > requirements.txt
+
+Verify the install succeeded:
+
+    pip list | grep -E "langchain|chromadb|pypdf"
+
+You should see lines for langchain, langchain-community, langchain-ollama,
+langchain-chroma, langchain-core, chromadb, pypdf, and several langchain-*
+transitive packages.
+
+--------------------------------------------------------------------------------
+4b. INSTALL THIS PROJECT AS AN EDITABLE PACKAGE
+--------------------------------------------------------------------------------
+
+This repo is structured as an installable Python package (`local_rag_sandbox`)
+under `src/`. Install it in editable mode so the scripts and tests can import
+shared config and helpers without sys.path hacks:
+
+    pip install -e ".[dev]"
+
+What this does:
+    - Reads pyproject.toml and registers `local_rag_sandbox` as installed
+      in the current environment.
+    - `-e` (editable) means changes to files in src/ are picked up immediately
+      without reinstall.
+    - `.[dev]` includes the optional dev tools: pytest (for tests) and ruff
+      (for linting). Drop the `[dev]` part if you don't want those.
+
+Verify the install:
+
+    python -c "from local_rag_sandbox.config import CHAT_MODEL; print(CHAT_MODEL)"
+    # should print: qwen2.5:7b
+
+    pytest tests/
+    # should report all smoke tests passing (7 tests).
+
+NOTE on LangChain v1.x:
+    As of late 2025, `pip install langchain` resolves to LangChain v1.x
+    (e.g. 1.2.x). The v1 release reorganized some module paths. Most imports
+    used in this project work unchanged, but if a script raises ImportError,
+    the fix is usually a one-line swap to either:
+        - the langchain_classic.* namespace (for legacy chain helpers), or
+        - the new v1 path documented in LangChain's v1 migration guide.
+
+--------------------------------------------------------------------------------
+5. INSTALL OLLAMA (LOCAL MODEL RUNTIME)
+--------------------------------------------------------------------------------
+
+Ollama is the runtime that downloads and serves local AI models on your Mac.
+It runs entirely offline once models are pulled.
+
+Install via Homebrew cask:
+
+    brew install --cask ollama
+
+This places `Ollama.app` in /Applications and symlinks the `ollama` CLI to
+/opt/homebrew/bin/ollama (which is on your PATH by default).
+
+Launch the app once to start the background daemon:
+
+    1. Spotlight (Cmd+Space) → type "Ollama" → Enter.
+    2. macOS may ask "Are you sure you want to open this app?" → click Open.
+    3. A small llama icon should appear in your menu bar (top-right of screen).
+       That confirms the daemon is running on localhost:11434.
+
+From now on, the daemon auto-starts at login. You only need to launch the app
+manually this one time.
+
+Verify:
+
+    ollama --version
+
+Expected output: `ollama version is 0.23.x` or newer.
+
+--------------------------------------------------------------------------------
+6. DOWNLOAD THE LOCAL AI MODELS
+--------------------------------------------------------------------------------
+
+Three models are needed. Pull them smallest-first so any installation problem
+surfaces early on a quick download rather than mid-way through a big one.
+
+    ollama pull nomic-embed-text     # ~274 MB — embedding model
+    ollama pull llama3.2:3b          # ~2.0 GB — fast fallback chat model
+    ollama pull qwen2.5:7b           # ~4.7 GB — main chat / reasoning model
+
+Each pull ends with `success` on completion. Total download: ~7 GB.
+
+Model roles:
+
+    nomic-embed-text     Converts text chunks and user questions into vectors
+                         for semantic search. Used by both ingest_report.py
+                         and ask_report.py.
+
+    qwen2.5:7b           The main "analyst" model. Reads retrieved chunks and
+                         produces the final structured answer in ask_report.py.
+
+    llama3.2:3b          Lightweight chat model. Used as a fast smoke-test to
+                         confirm the pipeline works before invoking the
+                         bigger qwen2.5:7b.
+
+--------------------------------------------------------------------------------
+7. VERIFY EVERYTHING IS IN PLACE
+--------------------------------------------------------------------------------
+
+Confirm all three models downloaded:
+
+    ollama list
+
+Expected output (IDs are content-addressable, so they will match exactly
+across machines):
+
+    NAME                       ID              SIZE      MODIFIED
+    qwen2.5:7b                 845dbda0ea48    4.7 GB    ...
+    llama3.2:3b                a80c4f17acd5    2.0 GB    ...
+    nomic-embed-text:latest    0a109f422b47    274 MB    ...
+
+Confirm Python packages are in the right environment:
+
+    which python
+    # should point to .../envs/local-rag-sandbox/bin/python
+    #             or  .../venv/bin/python
+
+    python -c "import langchain, langchain_ollama, langchain_chroma, chromadb, pypdf; print('ok')"
+    # should print: ok
+
+--------------------------------------------------------------------------------
+8. GIT IGNORE (REPRODUCIBILITY HYGIENE)
+--------------------------------------------------------------------------------
+
+The .gitignore at the project root excludes:
+
+    venv/               # if you used venv instead of conda
+    __pycache__/        # Python bytecode cache
+    *.pyc               # compiled Python files
+
+    chroma_db/          # vector DB files (regenerated by ingest_report.py)
+    data/*.pdf          # protects against committing licensed PDFs to a public repo
+
+    .env                # any secret config (none currently used)
+    .DS_Store           # macOS Finder metadata
+
+    PROPOSAL.md         # personal planning document, not part of the public repo
+                        # (remove this line if you want it published)
+
+--------------------------------------------------------------------------------
+9. WHAT'S NEXT (NOT YET IMPLEMENTED IN THIS SESSION)
+--------------------------------------------------------------------------------
+
+The environment, runtime, and models are all set up. The actual RAG pipeline
+still needs to be implemented:
+
+    a) Place one or more source documents into the data/ folder. Supported
+       file types (extensible — see config.py:SUPPORTED_EXTENSIONS):
+           .pdf  .txt  .md  .csv
+
+       For the v1 example use case (energy-transition RAG), drop a single
+       public energy report into data/ — any filename is fine. The ingest
+       script scans the folder and picks up everything supported.
+
+    b) The three scripts in scripts/ (see PROPOSAL.md Sections 14-16 for the
+       reference code; refactored to import shared config from the
+       local_rag_sandbox package and given general-purpose names):
+           scripts/test_ollama.py     — smoke test: can LangChain call Ollama?
+           scripts/ingest.py          — scan data/, load every supported file,
+                                        chunk + embed + persist to Chroma
+           scripts/ask.py             — query the DB and get a structured answer
+
+    c) Run them in order:
+           python scripts/test_ollama.py
+           python scripts/ingest.py
+           python scripts/ask.py
+
+See STATUS.txt for the current state of the project and where to resume.
+
+================================================================================
+END OF USER GUIDE
+================================================================================

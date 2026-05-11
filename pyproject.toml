@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "local-rag-sandbox"
+version = "0.1.0"
+description = "Local, offline-first RAG sandbox for asking grounded questions over your own documents — PDFs, text files, document collections, and databases — using Ollama, LangChain, and Chroma."
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Ahmadreza Rahbari" }]
+keywords = [
+    "rag",
+    "llm",
+    "ollama",
+    "langchain",
+    "chroma",
+    "local-ai",
+    "offline",
+    "document-qa",
+    "private-documents",
+    "energy-transition",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "langchain>=1.0",
+    "langchain-community>=0.4",
+    "langchain-ollama>=1.0",
+    "langchain-chroma>=1.0",
+    "chromadb>=1.0",
+    "pypdf>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
