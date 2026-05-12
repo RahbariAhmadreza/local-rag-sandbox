@@ -12,32 +12,30 @@ Everything runs on your machine. No cloud APIs. No data leaves your laptop. Appl
 
 Drop your documents into `data/<publisher>/`, run two scripts, then ask questions about them. Every answer is structured, evidence-cited (filename + page), and grounded in chunks retrieved from your local Chroma database. Nothing is sent to the cloud.
 
-A typical full-corpus query returns this shape:
+A real filtered query from the current corpus:
 
 ```bash
-$ python scripts/ask.py "What are the main types of electrolyzers covered in the corpus?"
+$ python scripts/ask.py --year 2024 "What were the main hydrogen bottlenecks mentioned across the 2024 reports?"
 
-Full corpus: no metadata filters applied.
+Filtered corpus: year=2024.
 Retrieving the 10 most relevant chunks ...
 Got 10 chunk(s). Sending to qwen2.5:7b ...
 
 ## Question
-What are the main types of electrolyzers covered in the corpus?
+What were the main hydrogen bottlenecks mentioned across the 2024 reports?
 
 ## Answer
-A short, direct answer grounded in the retrieved chunks.
+The main hydrogen bottlenecks mentioned in the 2024 reports include policy and regulatory challenges, limited investment, and minimal trade.
 
 ## Evidence
-(2024_global_hydrogen_review.pdf, p. 42)
-(2024_eto_main_report.pdf, p. 17)
-...
+- (2024_global_hydrogen_review.pdf, p. 18): "Investment is growing, stimulated mostly by policy action, but it is still well below the levels needed for a successful energy transition."
+- (2024_global_hydrogen_review.pdf, p. 170): "In some cases hydrogen was either absent from the regulations or fell under the scope of different legislations."
 
 ## Interpretation
-What the cited evidence implies for energy transition, policy,
-investment, or technology strategy.
+These bottlenecks highlight the need for more supportive policies and clearer regulatory frameworks to facilitate the growth of the hydrogen sector.
 
 ## Uncertainty
-What is missing, unclear, or not supported by the retrieved context.
+The context does not provide specific details on other potential bottlenecks such as technological limitations, infrastructure gaps, or market barriers.
 ```
 
 The headline Stage 2 feature is **metadata-aware filtered retrieval** — narrow the searched corpus before the question is asked:
