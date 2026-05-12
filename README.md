@@ -115,7 +115,8 @@ local-rag-sandbox/
 │   └── local_rag_sandbox/
 │       ├── __init__.py
 │       ├── config.py          # paths, model names, supported extensions
-│       └── prompts.py         # RAG prompt template (single, conditional)
+│       ├── prompts.py         # RAG prompt templates (depth modes)
+│       └── qa.py              # core RAG pipeline (shared by CLI + UI)
 ├── scripts/
 │   ├── test_ollama.py         # smoke test: can we reach Ollama?
 │   ├── ingest.py              # recursively scan data/, chunk, embed, persist
@@ -132,6 +133,7 @@ local-rag-sandbox/
 │       ├── 2024_global_hydrogen_review.pdf
 │       └── ...
 ├── chroma_db/                 # persistent vector DB (gitignored, rebuildable)
+├── streamlit_app.py           # optional browser UI (same qa.py as CLI)
 ├── eval/                      # placeholder for future evaluation questions
 ├── pyproject.toml             # package metadata + dev dependencies
 ├── requirements.txt           # pinned snapshot for full reproducibility
@@ -194,6 +196,12 @@ pip install -e ".[dev]"
 ```
 
 This installs `local_rag_sandbox` in editable mode plus pytest and ruff.
+
+For the optional Streamlit browser UI, install the `ui` extra as well:
+
+```bash
+pip install -e ".[dev,ui]"
+```
 
 To reproduce the exact pinned versions used during development:
 
@@ -353,6 +361,16 @@ investment, or strategy.
 What is missing, unclear, or not supported by the retrieved context.
 ```
 
+### 5. Web UI (Streamlit, optional)
+
+Uses the same `local_rag_sandbox.qa` pipeline as the CLI. Install with `pip install -e ".[dev,ui]"` if you have not already. From the project root:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+After re-ingesting new documents while the app is open, use **Refresh filter options** in the sidebar so dropdown values reload from Chroma.
+
 ## Configuration
 
 All tunable constants live in [`src/local_rag_sandbox/config.py`](src/local_rag_sandbox/config.py):
@@ -383,7 +401,7 @@ Swap to the fallback model by changing `CHAT_MODEL` to `"llama3.2:3b"`.
 
 - **No reranking.** Pure semantic top-K. Quality depends on how well chunks match the question wording.
 - **No comparison mode yet.** Filters narrow the searched corpus but do not orchestrate per-year / per-source retrieval and merging. Asking "How did IEA's view change from 2021 to 2025?" still treats all retrieved chunks symmetrically. A dedicated comparison mode is on the roadmap.
-- **Page numbers are zero-based.** `PyPDFLoader` reports pages starting from 0, so a citation like `(file.pdf, p. 17)` corresponds to page 18 as printed inside the PDF. A `(page + 1)` display fix is on the roadmap.
+- **Page numbers in raw metadata are zero-based.** `PyPDFLoader` stores `page` starting at 0. Answers and the Streamlit UI show a **display** page (loader value + 1) so citations line up with printed PDF page labels; expanders also show the raw loader value for debugging.
 - **Tables and figures in PDFs extract poorly.** `pypdf` handles prose well; complex layouts less so. For graphics-heavy PDFs, try `pymupdf` or `unstructured` (not installed by default).
 - **First-call latency.** Model loading into RAM costs 15–60 seconds on first run; subsequent runs reuse the warm model for ~5 minutes.
 
@@ -401,7 +419,6 @@ Possible directions, in rough priority order:
 - **Per-file deduplication via deterministic chunk IDs** — kills the duplicate-on-reingest footgun and makes re-ingest a no-op for unchanged files.
 - **Comparison mode across multiple reports** — per-year / per-source retrieval with merging, for questions like *"How did IEA's view of electrolyser deployment change from 2021 to 2025?"*.
 - **Reranking layer** — cross-encoder rerank of a wide top-N down to a sharp top-K to improve answer quality on broad questions.
-- **Citation page display** — `(page + 1)` display fix so user-facing citations match printed PDF page labels.
 - **Pydantic-typed structured answer outputs** for programmatic consumers downstream.
 - **Simple eval harness** using `eval/test_questions.json` — score retrieval + answer quality empirically rather than by vibe.
 - **Optional support for** `.docx`, `.xlsx`, `.html`.
