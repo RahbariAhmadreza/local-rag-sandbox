@@ -91,11 +91,17 @@ def build_context(relevant_docs: list[Document]) -> str:
         year = doc.metadata.get("year", "N/A")
         filename = doc.metadata.get("filename", "unknown file")
         page = doc.metadata.get("page", "N/A")
+        # PyPDFLoader stores pages zero-based, so a chunk with page=17 is the
+        # page printed as "18" inside the PDF. Display +1 so the LLM cites the
+        # human-visible page label, while leaving the raw metadata untouched
+        # in Chroma. Some PDFs use Roman numerals or offset front matter, in
+        # which case this +1 will still be off — accepted limitation for v1.
+        page_display = page + 1 if isinstance(page, int) else page
         parts.append(
             f"Chunk {i}\n"
             f"Publisher: {source} ({year})\n"
             f"File:      {filename}\n"
-            f"Page:      {page}\n"
+            f"Page:      {page_display}\n"
             f"Content:\n{doc.page_content}"
         )
     return "\n\n---\n\n".join(parts)
