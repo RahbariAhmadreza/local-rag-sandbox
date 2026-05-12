@@ -54,9 +54,13 @@ def test_model_names_are_set() -> None:
 
 
 def test_rag_template_has_required_sections() -> None:
+    """The standard depth template (RAG_ANSWER_TEMPLATE) defines the
+    full 5-section answer. The concise / learning templates are checked
+    separately at the integration boundary, not here."""
     for section in (
+        "## Question",
         "## Answer",
-        "## Evidence from the report",
+        "## Evidence",
         "## Interpretation",
         "## Uncertainty",
     ):
