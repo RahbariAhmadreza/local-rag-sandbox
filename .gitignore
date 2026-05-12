@@ -15,6 +15,7 @@ dist/
 .vscode/
 
 chroma_db/
+data/**/*.pdf
 data/*.pdf
 
 .env
