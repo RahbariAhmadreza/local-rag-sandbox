@@ -22,6 +22,13 @@ from local_rag_sandbox.config import (
     EMBED_MODEL,
 )
 from local_rag_sandbox.prompts import TEMPLATES_BY_DEPTH
+from local_rag_sandbox.retrieval import (
+    K_PER_SUBQUERY,
+    build_grouped_context,
+    cap_hits,
+    decompose_question,
+    dedupe_hits,
+)
 
 Depth = Literal["concise", "standard", "learning"]
 
@@ -42,6 +49,7 @@ class RetrievedChunk:
     page_raw: int | str          # zero-based when int, else "N/A"
     page_display: int | str      # page_raw + 1 when int, else page_raw
     content: str
+    retrieval_query: str | None = None  # focused subquery (Deep R&D multi-query only)
 
 
 @dataclass(frozen=True)
@@ -105,7 +113,11 @@ def normalise_filters(
     )
 
 
-def _doc_to_chunk(doc: Document) -> RetrievedChunk:
+def _doc_to_chunk(
+    doc: Document,
+    *,
+    retrieval_query: str | None = None,
+) -> RetrievedChunk:
     """Convert a langchain Document into a RetrievedChunk with display page."""
     page_raw = doc.metadata.get("page", "N/A")
     # PyPDFLoader is zero-based; display +1 so citations match printed PDF
@@ -120,6 +132,7 @@ def _doc_to_chunk(doc: Document) -> RetrievedChunk:
         page_raw=page_raw,
         page_display=page_display,
         content=doc.page_content,
+        retrieval_query=retrieval_query,
     )
 
 
@@ -140,6 +153,49 @@ def _build_context(chunks: list[RetrievedChunk]) -> str:
 def _emit(on_progress: Callable[[str], None] | None, message: str) -> None:
     if on_progress is not None:
         on_progress(message)
+
+
+def _retrieve_learning(
+    vectorstore: Chroma,
+    query: str,
+    *,
+    where_filter: dict | None,
+    effective_top_k: int,
+    llm: ChatOllama,
+    on_progress: Callable[[str], None] | None,
+) -> list[RetrievedChunk] | None:
+    """Multi-query retrieval for Deep R&D: decompose, search, dedupe, cap."""
+    _emit(on_progress, "Generating focused retrieval queries ...")
+    subqueries = decompose_question(query, llm)
+
+    _emit(on_progress, "Focused retrieval queries:")
+    for i, sq in enumerate(subqueries, start=1):
+        _emit(on_progress, f"  {i}. {sq}")
+
+    all_hits: list[tuple[Document, str]] = []
+    n = len(subqueries)
+    for i, subquery in enumerate(subqueries, start=1):
+        _emit(on_progress, f"Retrieving query {i}/{n}: {subquery}")
+        search_kwargs: dict = {"k": K_PER_SUBQUERY}
+        if where_filter is not None:
+            search_kwargs["filter"] = where_filter
+        docs = vectorstore.similarity_search(subquery, **search_kwargs)
+        for doc in docs:
+            all_hits.append((doc, subquery))
+
+    if not all_hits:
+        return None
+
+    merged = cap_hits(dedupe_hits(all_hits), effective_top_k)
+    chunks = [
+        _doc_to_chunk(doc, retrieval_query=retrieval_query)
+        for doc, retrieval_query in merged
+    ]
+    _emit(
+        on_progress,
+        f"Merged {len(chunks)} unique chunk(s) from {n} focused quer{'y' if n == 1 else 'ies'}.",
+    )
+    return chunks
 
 
 def answer_question(
@@ -175,29 +231,50 @@ def answer_question(
         collection_name=COLLECTION_NAME,
     )
 
-    search_kwargs: dict = {"k": effective_top_k}
     where_filter = build_where_filter(source, year, topic)
-    if where_filter is not None:
-        search_kwargs["filter"] = where_filter
-    retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
+    llm = ChatOllama(model=CHAT_MODEL, temperature=0)
 
-    _emit(on_progress, f"Retrieving the {effective_top_k} most relevant chunks ...")
-    docs = retriever.invoke(query)
-    if not docs:
-        _emit(
-            on_progress,
-            "No relevant chunks found. The filters may be too narrow, the index "
-            "may be empty, or the question may be way off-topic.",
+    if depth == "learning":
+        chunks = _retrieve_learning(
+            vectorstore,
+            query,
+            where_filter=where_filter,
+            effective_top_k=effective_top_k,
+            llm=llm,
+            on_progress=on_progress,
         )
-        return None
+        if not chunks:
+            _emit(
+                on_progress,
+                "No relevant chunks found. The filters may be too narrow, the index "
+                "may be empty, or the question may be way off-topic.",
+            )
+            return None
+        context = build_grouped_context(chunks)
+    else:
+        search_kwargs: dict = {"k": effective_top_k}
+        if where_filter is not None:
+            search_kwargs["filter"] = where_filter
+        retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
 
-    chunks = [_doc_to_chunk(d) for d in docs]
-    _emit(on_progress, f"Got {len(chunks)} chunk(s). Sending to {CHAT_MODEL} ...\n")
+        _emit(on_progress, f"Retrieving the {effective_top_k} most relevant chunks ...")
+        docs = retriever.invoke(query)
+        if not docs:
+            _emit(
+                on_progress,
+                "No relevant chunks found. The filters may be too narrow, the index "
+                "may be empty, or the question may be way off-topic.",
+            )
+            return None
 
-    context = _build_context(chunks)
+        chunks = [_doc_to_chunk(d) for d in docs]
+        _emit(on_progress, f"Got {len(chunks)} chunk(s).")
+        context = _build_context(chunks)
+
+    _emit(on_progress, f"Sending to {CHAT_MODEL} ...\n")
+
     template = TEMPLATES_BY_DEPTH[depth]
     prompt = ChatPromptTemplate.from_template(template)
-    llm = ChatOllama(model=CHAT_MODEL, temperature=0)
     chain = prompt | llm
     response = chain.invoke({
         "context": context,

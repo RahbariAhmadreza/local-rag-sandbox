@@ -23,9 +23,11 @@ Omitting all filters searches the full corpus (same as the bare command).
 --depth controls the prompt template and the default --top-k:
     concise   -> top_k=6,  brief answer (Question/Answer/Evidence)
     standard  -> top_k=15, analytical answer with Discussion (the default)
-    learning  -> top_k=20, deep R&D synthesis (6 sections)
+    learning  -> top_k=20, deep R&D synthesis (6 sections); uses multi-query
+                retrieval (3–5 focused subqueries, k=5 each, merged and deduped)
 
-An explicit --top-k always wins over the depth default.
+An explicit --top-k always wins over the depth default. For learning depth,
+--top-k caps the number of unique chunks after merge (not per subquery).
 
 Prerequisite: run scripts/ingest.py at least once so that CHROMA_DIR
 contains an indexed collection.
