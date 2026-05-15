@@ -14,16 +14,16 @@ Usage:
     python scripts/ask.py --source iea --year 2024 "..."           # combined (AND)
     python scripts/ask.py --top-k 20 "..."                         # broader synthesis
     python scripts/ask.py --top-k 4 "..."                          # tighter context
-    python scripts/ask.py --depth learning "..."                   # pedagogical answer
+    python scripts/ask.py --depth learning "..."                   # deep R&D synthesis
 
 Filters use AND semantics and exact-match. --source and --topic are
 normalised to lowercase to match the metadata produced during ingestion.
 Omitting all filters searches the full corpus (same as the bare command).
 
 --depth controls the prompt template and the default --top-k:
-    concise   -> top_k=4,  3-section answer (Question/Answer/Evidence)
-    standard  -> top_k=10, 5-section answer (the default)
-    learning  -> top_k=15, 5-section answer with pedagogical tone
+    concise   -> top_k=6,  brief answer (Question/Answer/Evidence)
+    standard  -> top_k=15, analytical answer with Discussion (the default)
+    learning  -> top_k=20, deep R&D synthesis (6 sections)
 
 An explicit --top-k always wins over the depth default.
 

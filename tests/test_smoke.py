@@ -61,7 +61,7 @@ def test_rag_template_has_required_sections() -> None:
         "## Question",
         "## Answer",
         "## Evidence",
-        "## Interpretation",
+        "## Discussion",
         "## Uncertainty",
     ):
         assert section in RAG_ANSWER_TEMPLATE

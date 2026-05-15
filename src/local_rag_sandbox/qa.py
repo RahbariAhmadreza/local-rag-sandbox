@@ -26,9 +26,9 @@ from local_rag_sandbox.prompts import TEMPLATES_BY_DEPTH
 Depth = Literal["concise", "standard", "learning"]
 
 DEPTH_TOP_K: dict[Depth, int] = {
-    "concise":  4,
-    "standard": 10,
-    "learning": 15,
+    "concise":  6,
+    "standard": 15,
+    "learning": 20,
 }
 
 
