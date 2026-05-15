@@ -88,9 +88,9 @@ def test_decompose_question_falls_back_when_parse_empty() -> None:
     assert decompose_question(question, _EmptyLLM()) == [question]
 
 
-def test_parse_subqueries_caps_at_five() -> None:
+def test_parse_subqueries_caps_at_six() -> None:
     text = "\n".join(f"query {i}" for i in range(10))
-    assert len(parse_subqueries(text)) == 5
+    assert len(parse_subqueries(text)) == 6
 
 
 # --- content hash ---

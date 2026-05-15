@@ -29,8 +29,8 @@ class RetrievedChunkLike(Protocol):
     retrieval_query: str | None
 
 K_PER_SUBQUERY: int = 5
-SUBQUERY_MIN: int = 3
-SUBQUERY_MAX: int = 5
+SUBQUERY_MIN: int = 4
+SUBQUERY_MAX: int = 6
 
 _LINE_PREFIX_RE = re.compile(
     r"^\s*(?:"
@@ -43,12 +43,19 @@ _LINE_PREFIX_RE = re.compile(
 DECOMPOSE_PROMPT: str = """\
 You help retrieve passages from a local document library.
 
-Given the user question below, write {min_q} to {max_q} short focused search queries that would help find relevant passages.
+Given the user question below, write {min_q} to {max_q} short focused search queries that would help find diverse, relevant passages.
 
 Rules:
 - Use only terms present in or strongly implied by the user's question.
-- Do not add outside domain knowledge or assumptions.
-- Each query should target a distinct aspect of the question.
+- Do not add outside domain knowledge, sector jargon, or assumptions.
+- Each query must target a distinct aspect. Prefer diversity across these angles only when the question implies them (rephrase using the user's own wording):
+  - causes, barriers, risks, or problems explicitly asked about
+  - costs, resources, or constraints (only if implied)
+  - adoption, demand, uptake, or deployment (only if implied)
+  - implementation, infrastructure, delivery, or process (only if implied)
+  - uncertainty, delays, gaps, or limitations (only if implied)
+- Skip any angle that is not present or strongly implied by the question.
+- Do not invent extra topics to fill the count; fewer distinct angles are better than padded queries.
 - Write one search query per line.
 - Output only the queries, nothing else.
 
@@ -91,7 +98,7 @@ def parse_subqueries(text: str) -> list[str]:
 
 
 def decompose_question(question: str, llm: BaseChatModel) -> list[str]:
-    """Generate 3–5 focused subqueries; fall back to the original question."""
+    """Generate 4–6 focused subqueries; fall back to the original question."""
     prompt = DECOMPOSE_PROMPT.format(
         min_q=SUBQUERY_MIN,
         max_q=SUBQUERY_MAX,

@@ -172,7 +172,7 @@ Deep R&D mode (mandatory; never copy this block into your answer):
 [Mirror Main themes exactly. Every bullet must start: - filename.pdf, p. N: paraphrase or exact quote. Unsupported theme only: The retrieved evidence is weak on this point. Never use that line for the entire Evidence section when other themes have entries.]
 
 ## Discussion
-[Put the pieces together without adding unsupported facts. Discuss only patterns visible in the evidence you listed in Evidence. Clearly separate document-backed claims from reasoned discussion. Do not attach implications to chunks that do not support them.]
+[Write 2–4 substantive paragraphs when Evidence supports it. For strong evidence, explain mechanisms and implications grounded in cited chunks. Where evidence is thin or indirect, state that limitation explicitly instead of confident claims. Do not add facts beyond retrieved evidence.]
 
 ## Uncertainty and follow-up questions
 [State gaps, weak evidence, and conflicts between sources. Name themes you omitted because retrieval did not directly support them. End with exactly 2–4 concrete follow-up questions grounded in what was and was not covered.]
