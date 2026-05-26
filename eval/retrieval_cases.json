@@ -26,9 +26,16 @@
     },
     {
       "id": "electrolyser_technologies",
-      "question": "What are the main types of electrolyzers covered in the corpus, and how do reports describe their trade-offs?",
-      "notes": "Corpus-wide factual question. expected_evidence may be filled with partial reference pages after manual review; not a complete gold set.",
-      "expected_evidence": []
+      "question": "What are the four main water electrolyzer technologies, and which one currently holds the largest share of global manufacturing capacity?",
+      "notes": "Narrow factual retrieval case. expected_evidence was refined using NotebookLM-assisted source review, local retrieval validation, and manual page checks. Pages use local page_display values from this repo's ingestion/retrieval pipeline. Tests retrieval of electrolyzer technology names and manufacturing-capacity dominance; not intended to evaluate broader trade-off synthesis. expected_evidence remains partial and corpus-specific, intended for regression/debugging only.",
+      "expected_evidence": [
+        {"filename": "2021_global_hydrogen_review.pdf", "page": 116},
+        {"filename": "2022_global_hydrogen_review.pdf", "page": 78},
+        {"filename": "2022_hydrogen_forecast_2050.pdf", "page": 52},
+        {"filename": "2023_global_hydrogen_review.pdf", "page": 72},
+        {"filename": "2024_global_hydrogen_review.pdf", "page": 74},
+        {"filename": "2025_global_hydrogen_review.pdf", "page": 111}
+      ]
     }
   ]
 }
