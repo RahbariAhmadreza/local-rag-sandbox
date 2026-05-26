@@ -53,6 +53,21 @@ class RetrievedChunk:
 
 
 @dataclass(frozen=True)
+class SubqueryResult:
+    """Chunks retrieved for one focused subquery (before global dedupe/cap)."""
+    query: str
+    hits: list[RetrievedChunk]
+
+
+@dataclass(frozen=True)
+class RetrievalTrace:
+    """Structured trace of Deep R&D multi-query retrieval."""
+    original_query: str
+    subquery_results: list[SubqueryResult]
+    final_chunks: list[RetrievedChunk]
+
+
+@dataclass(frozen=True)
 class QAResult:
     """Structured result of one Q&A round."""
     question: str
@@ -163,7 +178,7 @@ def _retrieve_learning(
     effective_top_k: int,
     llm: ChatOllama,
     on_progress: Callable[[str], None] | None,
-) -> list[RetrievedChunk] | None:
+) -> RetrievalTrace | None:
     """Multi-query retrieval for Deep R&D: decompose, search, dedupe, cap."""
     _emit(on_progress, "Generating focused retrieval queries ...")
     subqueries = decompose_question(query, llm)
@@ -172,6 +187,7 @@ def _retrieve_learning(
     for i, sq in enumerate(subqueries, start=1):
         _emit(on_progress, f"  {i}. {sq}")
 
+    subquery_results: list[SubqueryResult] = []
     all_hits: list[tuple[Document, str]] = []
     n = len(subqueries)
     for i, subquery in enumerate(subqueries, start=1):
@@ -180,6 +196,10 @@ def _retrieve_learning(
         if where_filter is not None:
             search_kwargs["filter"] = where_filter
         docs = vectorstore.similarity_search(subquery, **search_kwargs)
+        per_query_hits = [
+            _doc_to_chunk(doc, retrieval_query=subquery) for doc in docs
+        ]
+        subquery_results.append(SubqueryResult(query=subquery, hits=per_query_hits))
         for doc in docs:
             all_hits.append((doc, subquery))
 
@@ -187,15 +207,19 @@ def _retrieve_learning(
         return None
 
     merged = cap_hits(dedupe_hits(all_hits), effective_top_k)
-    chunks = [
+    final_chunks = [
         _doc_to_chunk(doc, retrieval_query=retrieval_query)
         for doc, retrieval_query in merged
     ]
     _emit(
         on_progress,
-        f"Merged {len(chunks)} unique chunk(s) from {n} focused quer{'y' if n == 1 else 'ies'}.",
+        f"Merged {len(final_chunks)} unique chunk(s) from {n} focused quer{'y' if n == 1 else 'ies'}.",
     )
-    return chunks
+    return RetrievalTrace(
+        original_query=query,
+        subquery_results=subquery_results,
+        final_chunks=final_chunks,
+    )
 
 
 def answer_question(
@@ -235,7 +259,7 @@ def answer_question(
     llm = ChatOllama(model=CHAT_MODEL, temperature=0)
 
     if depth == "learning":
-        chunks = _retrieve_learning(
+        trace = _retrieve_learning(
             vectorstore,
             query,
             where_filter=where_filter,
@@ -243,13 +267,14 @@ def answer_question(
             llm=llm,
             on_progress=on_progress,
         )
-        if not chunks:
+        if trace is None:
             _emit(
                 on_progress,
                 "No relevant chunks found. The filters may be too narrow, the index "
                 "may be empty, or the question may be way off-topic.",
             )
             return None
+        chunks = trace.final_chunks
         context = build_grouped_context(chunks)
     else:
         search_kwargs: dict = {"k": effective_top_k}
