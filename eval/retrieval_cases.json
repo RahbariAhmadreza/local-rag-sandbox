@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "hydrogen_fid_offtake_investment",
+      "question": "What investment, offtake, and FID risks do the indexed documents associate with hydrogen projects?",
+      "notes": "Primary regression case from Deep R&D diagnostics. expected_evidence is partial gold only; recall is indicative, not a full benchmark.",
+      "expected_evidence": [
+        {"filename": "2026_eto_hydrogen_forecast.pdf", "page": 8},
+        {"filename": "2026_eto_hydrogen_forecast.pdf", "page": 34},
+        {"filename": "2026_eto_hydrogen_forecast.pdf", "page": 35},
+        {"filename": "2026_eto_hydrogen_forecast.pdf", "page": 81},
+        {"filename": "2024_global_hydrogen_review.pdf", "page": 18},
+        {"filename": "2025_global_hydrogen_review.pdf", "page": 213}
+      ]
+    },
+    {
+      "id": "hydrogen_bottlenecks_broad",
+      "question": "What were the main hydrogen bottlenecks mentioned across the indexed reports?",
+      "notes": "Broad synthesis question. No gold pages yet; recall will show n/a.",
+      "expected_evidence": []
+    },
+    {
+      "id": "electrolyser_technologies",
+      "question": "What are the main types of electrolyzers covered in the corpus, and how do reports describe their trade-offs?",
+      "notes": "Corpus-wide factual question. expected_evidence may be expanded after manual review.",
+      "expected_evidence": []
+    }
+  ]
+}
