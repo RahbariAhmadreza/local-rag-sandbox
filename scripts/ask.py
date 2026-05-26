@@ -15,6 +15,7 @@ Usage:
     python scripts/ask.py --top-k 20 "..."                         # broader synthesis
     python scripts/ask.py --top-k 4 "..."                          # tighter context
     python scripts/ask.py --depth learning "..."                   # deep R&D synthesis
+    python scripts/ask.py --depth learning --subquery-k 10 "..."   # expert: more chunks per subquery
 
 Filters use AND semantics and exact-match. --source and --topic are
 normalised to lowercase to match the metadata produced during ingestion.
@@ -36,6 +37,7 @@ contains an indexed collection.
 import argparse
 
 from local_rag_sandbox.qa import DEPTH_TOP_K, answer_question
+from local_rag_sandbox.retrieval import K_PER_SUBQUERY
 
 
 def main() -> None:
@@ -73,7 +75,19 @@ def main() -> None:
         default="standard",
         help="Answer style. Default: standard.",
     )
+    parser.add_argument(
+        "--subquery-k",
+        type=int,
+        default=None,
+        help=(
+            f"Chunks retrieved per focused subquery in --depth learning only "
+            f"(default: {K_PER_SUBQUERY}). Ignored for concise/standard."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.subquery_k is not None and args.depth != "learning":
+        parser.error("--subquery-k only applies to --depth learning")
 
     if args.question:
         query = " ".join(args.question).strip()
@@ -92,6 +106,7 @@ def main() -> None:
         depth=args.depth,
         top_k=args.top_k,
         on_progress=print,
+        subquery_k=args.subquery_k,
     )
     if result is None:
         return

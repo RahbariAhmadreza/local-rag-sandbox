@@ -233,6 +233,7 @@ def answer_question(
     depth: Depth = "standard",
     top_k: int | None = None,
     on_progress: Callable[[str], None] | None = None,
+    subquery_k: int | None = None,
 ) -> QAResult | None:
     """Run the full RAG pipeline and return a structured result.
 
@@ -268,6 +269,7 @@ def answer_question(
             effective_top_k=effective_top_k,
             llm=llm,
             on_progress=on_progress,
+            subquery_k=subquery_k,
         )
         if trace is None:
             _emit(
