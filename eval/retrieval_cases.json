@@ -5,14 +5,17 @@
     {
       "id": "hydrogen_fid_offtake_investment",
       "question": "What investment, offtake, and FID risks do the indexed documents associate with hydrogen projects?",
-      "notes": "Primary regression case. expected_evidence lists example DNV/IEA pages observed during diagnostics on this corpus; they are partial reference labels for comparing runs (e.g. subquery-k=5 vs k=10), not tuning targets or universal truths. Update or replace when the index changes.",
+      "notes": "Primary regression case. expected_evidence was refined using NotebookLM-assisted source review plus local diagnostic validation. Pages use local page_display values from this repo's ingestion/retrieval pipeline (not necessarily NotebookLM or printed PDF page numbers). expected_evidence remains partial and corpus-specific, intended for regression/debugging only; update or replace when the indexed corpus changes.",
       "expected_evidence": [
         {"filename": "2026_eto_hydrogen_forecast.pdf", "page": 8},
         {"filename": "2026_eto_hydrogen_forecast.pdf", "page": 34},
         {"filename": "2026_eto_hydrogen_forecast.pdf", "page": 35},
         {"filename": "2026_eto_hydrogen_forecast.pdf", "page": 81},
-        {"filename": "2024_global_hydrogen_review.pdf", "page": 18},
-        {"filename": "2025_global_hydrogen_review.pdf", "page": 213}
+        {"filename": "2022_global_hydrogen_review.pdf", "page": 175},
+        {"filename": "2022_global_hydrogen_review.pdf", "page": 217},
+        {"filename": "2022_hydrogen_forecast_2050.pdf", "page": 27},
+        {"filename": "2025_global_hydrogen_review.pdf", "page": 213},
+        {"filename": "2026_eto_hydrogen_forecast.pdf", "page": 43}
       ]
     },
     {
