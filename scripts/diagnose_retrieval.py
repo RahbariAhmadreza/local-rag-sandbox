@@ -7,6 +7,7 @@ Usage:
     python scripts/diagnose_retrieval.py "What were the main hydrogen bottlenecks?"
     python scripts/diagnose_retrieval.py --source iea --year 2024 "..."
     python scripts/diagnose_retrieval.py --top-k 15 "..."
+    python scripts/diagnose_retrieval.py --subquery-k 10 "..."
 
 Requires a built Chroma index (``python scripts/ingest.py``) and a running Ollama
 with the configured chat and embedding models.
@@ -36,7 +37,7 @@ from local_rag_sandbox.qa import (
     describe_filters,
     normalise_filters,
 )
-from local_rag_sandbox.retrieval import content_hash
+from local_rag_sandbox.retrieval import K_PER_SUBQUERY, content_hash
 
 CONTENT_PREVIEW_CHARS = 120
 _SEPARATOR = "=" * 72
@@ -113,6 +114,7 @@ def print_trace_report(
     *,
     filter_context: str,
     effective_top_k: int,
+    effective_subquery_k: int,
 ) -> None:
     """Print a structured retrieval diagnostic report."""
     print(_SEPARATOR)
@@ -126,6 +128,7 @@ def print_trace_report(
     print(f"  {filter_context}")
     print()
     print(f"Effective top-k (after dedupe/cap): {effective_top_k}")
+    print(f"Per-subquery k (raw hits each): {effective_subquery_k}")
     print()
 
     print("Generated subqueries:")
@@ -196,6 +199,7 @@ def run_diagnosis(
     year: int | None,
     topic: str | None,
     top_k: int | None,
+    subquery_k: int | None,
 ) -> int:
     """Run learning-mode retrieval and print diagnostics. Returns process exit code."""
     if not CHROMA_DIR.exists() or not any(CHROMA_DIR.iterdir()):
@@ -205,6 +209,7 @@ def run_diagnosis(
 
     norm_source, norm_topic = normalise_filters(source, topic)
     effective_top_k = top_k if top_k is not None else DEPTH_TOP_K["learning"]
+    effective_subquery_k = subquery_k if subquery_k is not None else K_PER_SUBQUERY
     filter_context = describe_filters(norm_source, year, norm_topic)
 
     embeddings = OllamaEmbeddings(model=EMBED_MODEL)
@@ -223,6 +228,7 @@ def run_diagnosis(
         effective_top_k=effective_top_k,
         llm=llm,
         on_progress=None,
+        subquery_k=subquery_k,
     )
 
     if trace is None:
@@ -237,12 +243,18 @@ def run_diagnosis(
         print(f"  {filter_context}")
         print()
         print(f"Effective top-k (after dedupe/cap): {effective_top_k}")
+        print(f"Per-subquery k (raw hits each): {effective_subquery_k}")
         print()
         print("No chunks retrieved. Filters may be too narrow, the index may be empty,")
         print("or the question may be off-topic.")
         return 1
 
-    print_trace_report(trace, filter_context=filter_context, effective_top_k=effective_top_k)
+    print_trace_report(
+        trace,
+        filter_context=filter_context,
+        effective_top_k=effective_top_k,
+        effective_subquery_k=effective_subquery_k,
+    )
     return 0
 
 
@@ -272,6 +284,12 @@ def main() -> None:
         default=None,
         help=f"Cap on unique chunks after merge (default: {DEPTH_TOP_K['learning']}).",
     )
+    parser.add_argument(
+        "--subquery-k",
+        type=int,
+        default=None,
+        help=f"Chunks retrieved per focused subquery (default: {K_PER_SUBQUERY}).",
+    )
     args = parser.parse_args()
 
     query = " ".join(args.question).strip()
@@ -285,6 +303,7 @@ def main() -> None:
         year=args.year,
         topic=args.topic,
         top_k=args.top_k,
+        subquery_k=args.subquery_k,
     )
     sys.exit(code)
 

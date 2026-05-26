@@ -108,11 +108,30 @@ def test_print_trace_report_includes_key_sections() -> None:
             trace,
             filter_context="Full corpus: no metadata filters applied.",
             effective_top_k=20,
+            effective_subquery_k=5,
         )
     out = buf.getvalue()
     assert "RETRIEVAL DIAGNOSTICS" in out
     assert "What are the risks?" in out
+    assert "Per-subquery k (raw hits each): 5" in out
     assert "Generated subqueries:" in out
     assert "RAW HITS PER SUBQUERY" in out
     assert "FINAL MERGED CHUNKS" in out
     assert "CROSS-SUBQUERY DUPLICATES" in out
+
+
+def test_print_trace_report_shows_subquery_k_override() -> None:
+    trace = RetrievalTrace(
+        original_query="q",
+        subquery_results=[],
+        final_chunks=[],
+    )
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        dr.print_trace_report(
+            trace,
+            filter_context="Full corpus: no metadata filters applied.",
+            effective_top_k=20,
+            effective_subquery_k=10,
+        )
+    assert "Per-subquery k (raw hits each): 10" in buf.getvalue()

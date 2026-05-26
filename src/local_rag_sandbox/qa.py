@@ -178,8 +178,10 @@ def _retrieve_learning(
     effective_top_k: int,
     llm: ChatOllama,
     on_progress: Callable[[str], None] | None,
+    subquery_k: int | None = None,
 ) -> RetrievalTrace | None:
     """Multi-query retrieval for Deep R&D: decompose, search, dedupe, cap."""
+    effective_subquery_k = subquery_k if subquery_k is not None else K_PER_SUBQUERY
     _emit(on_progress, "Generating focused retrieval queries ...")
     subqueries = decompose_question(query, llm)
 
@@ -192,7 +194,7 @@ def _retrieve_learning(
     n = len(subqueries)
     for i, subquery in enumerate(subqueries, start=1):
         _emit(on_progress, f"Retrieving query {i}/{n}: {subquery}")
-        search_kwargs: dict = {"k": K_PER_SUBQUERY}
+        search_kwargs: dict = {"k": effective_subquery_k}
         if where_filter is not None:
             search_kwargs["filter"] = where_filter
         docs = vectorstore.similarity_search(subquery, **search_kwargs)

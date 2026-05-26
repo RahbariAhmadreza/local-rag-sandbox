@@ -9,6 +9,7 @@ from local_rag_sandbox.qa import (
     SubqueryResult,
     _retrieve_learning,
 )
+from local_rag_sandbox.retrieval import K_PER_SUBQUERY
 
 
 def _doc(
@@ -122,3 +123,46 @@ def test_retrieve_learning_cap_limits_final_chunks(
     assert trace is not None
     assert len(trace.subquery_results[0].hits) == 5
     assert len(trace.final_chunks) == 3
+
+
+@patch("local_rag_sandbox.qa.decompose_question")
+def test_retrieve_learning_default_subquery_k(
+    mock_decompose: MagicMock,
+) -> None:
+    mock_decompose.return_value = ["q1", "q2"]
+    vectorstore = MagicMock()
+    vectorstore.similarity_search.return_value = []
+
+    _retrieve_learning(
+        vectorstore,
+        "original",
+        where_filter=None,
+        effective_top_k=5,
+        llm=MagicMock(),
+        on_progress=None,
+    )
+
+    for call in vectorstore.similarity_search.call_args_list:
+        assert call.kwargs["k"] == K_PER_SUBQUERY
+
+
+@patch("local_rag_sandbox.qa.decompose_question")
+def test_retrieve_learning_uses_subquery_k_override(
+    mock_decompose: MagicMock,
+) -> None:
+    mock_decompose.return_value = ["q1", "q2"]
+    vectorstore = MagicMock()
+    vectorstore.similarity_search.return_value = [_doc()]
+
+    _retrieve_learning(
+        vectorstore,
+        "original",
+        where_filter=None,
+        effective_top_k=5,
+        llm=MagicMock(),
+        on_progress=None,
+        subquery_k=10,
+    )
+
+    for call in vectorstore.similarity_search.call_args_list:
+        assert call.kwargs["k"] == 10
