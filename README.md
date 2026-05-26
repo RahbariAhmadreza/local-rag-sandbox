@@ -116,15 +116,20 @@ local-rag-sandbox/
 │       ├── __init__.py
 │       ├── config.py          # paths, model names, supported extensions
 │       ├── prompts.py         # RAG prompt templates (depth modes)
+│       ├── retrieval.py       # Deep R&D: decompose, dedupe, grouped context
+│       ├── retrieval_eval.py  # retrieval-only eval metrics (offline-testable)
 │       └── qa.py              # core RAG pipeline (shared by CLI + UI)
 ├── scripts/
 │   ├── test_ollama.py         # smoke test: can we reach Ollama?
 │   ├── ingest.py              # recursively scan data/, chunk, embed, persist
 │   ├── inspect_db.py          # read-only Chroma stats: chunk counts + samples
-│   └── ask.py                 # query Chroma with optional metadata filters
-├── tests/
-│   ├── __init__.py
-│   └── test_smoke.py          # imports & config sanity (8 tests)
+│   ├── ask.py                 # query Chroma with optional metadata filters
+│   ├── diagnose_retrieval.py  # Deep R&D retrieval trace (no answer generation)
+│   └── eval_retrieval.py      # batch compare retrieval settings (e.g. k5 vs k10)
+├── eval/
+│   └── retrieval_cases.json   # partial reference cases for retrieval eval
+├── tests/                     # offline unit tests (no Ollama/Chroma in CI)
+├── GEMINI.md                  # agent instructions for this repo
 ├── data/                      # gitignored — see "Add source documents" for layout
 │   ├── dnv/                   # one subfolder per publisher
 │   │   ├── 2024_eto_main_report.pdf
@@ -134,7 +139,6 @@ local-rag-sandbox/
 │       └── ...
 ├── chroma_db/                 # persistent vector DB (gitignored, rebuildable)
 ├── streamlit_app.py           # optional browser UI (same qa.py as CLI)
-├── eval/                      # placeholder for future evaluation questions
 ├── pyproject.toml             # package metadata + dev dependencies
 ├── requirements.txt           # pinned snapshot for full reproducibility
 ├── .gitignore
@@ -212,7 +216,7 @@ pip install -r requirements.txt
 ### 5. Verify the install
 
 ```bash
-pytest -v             # should report 8 passed
+pytest -v             # offline unit tests (50+; no Ollama/Chroma required)
 python scripts/test_ollama.py    # should print 3 bullets about grid congestion
 ```
 
@@ -328,6 +332,13 @@ python scripts/ask.py --top-k 4 "..."     # narrow factual question
 python scripts/ask.py --top-k 20 "..."    # broad synthesis across many chunks
 ```
 
+**Deep R&D (learning depth).** Multi-query retrieval with default 5 chunks per focused subquery and merged cap 20. Expert override for experiments:
+
+```bash
+python scripts/ask.py --depth learning "Your broad synthesis question"
+python scripts/ask.py --depth learning --subquery-k 10 "..."   # learning only; not default
+```
+
 Before retrieval, the active filter set is printed. Examples:
 
 ```
@@ -361,15 +372,32 @@ investment, or strategy.
 What is missing, unclear, or not supported by the retrieved context.
 ```
 
-### 5. Web UI (Streamlit, optional)
+### 5. Retrieval diagnostics and eval (optional)
 
-Uses the same `local_rag_sandbox.qa` pipeline as the CLI. Install with `pip install -e ".[dev,ui]"` if you have not already. From the project root:
+Inspect Deep R&D retrieval without generating an answer. Requires the same Chroma index and Ollama as `ask.py`.
+
+```bash
+# Full trace: subqueries, raw hits per subquery, final chunks, cross-subquery duplicates
+python scripts/diagnose_retrieval.py "What were the main hydrogen bottlenecks?"
+
+python scripts/diagnose_retrieval.py --subquery-k 10 \
+  "What investment, offtake, and FID risks do the indexed documents associate with hydrogen projects?"
+
+# Compare default per-subquery k=5 vs k=10 on cases in eval/retrieval_cases.json
+python scripts/eval_retrieval.py --compare
+```
+
+`expected_evidence` in the case file is **partial, corpus-specific reference labels** for regression (not a complete gold standard). Eval prints matched/missed pages per profile when gold labels exist.
+
+### 6. Web UI (Streamlit, optional)
+
+Uses the same `local_rag_sandbox.qa` pipeline as the CLI (full corpus; no metadata filter UI in the app). Install with `pip install -e ".[dev,ui]"` if you have not already. From the project root:
 
 ```bash
 streamlit run streamlit_app.py
 ```
 
-After re-ingesting new documents while the app is open, use **Refresh filter options** in the sidebar so dropdown values reload from Chroma.
+After re-ingesting new documents, restart or refresh the app so it picks up the updated index.
 
 ## Configuration
 
@@ -399,7 +427,8 @@ Swap to the fallback model by changing `CHAT_MODEL` to `"llama3.2:3b"`.
 
   Deterministic chunk IDs are on the roadmap to make re-ingest a no-op for already-indexed files.
 
-- **No reranking.** Pure semantic top-K. Quality depends on how well chunks match the question wording.
+- **No reranking.** Pure semantic top-K (first-come-first-served dedupe/cap in Deep R&D). Raising `--subquery-k` widens the raw pool but does not automatically improve answer focus.
+- **Retrieval eval is indicative.** `eval_retrieval.py` compares settings on partial reference pages; it does not grade answer quality.
 - **No comparison mode yet.** Filters narrow the searched corpus but do not orchestrate per-year / per-source retrieval and merging. Asking "How did IEA's view change from 2021 to 2025?" still treats all retrieved chunks symmetrically. A dedicated comparison mode is on the roadmap.
 - **Page numbers in raw metadata are zero-based.** `PyPDFLoader` stores `page` starting at 0. Answers and the Streamlit UI show a **display** page (loader value + 1) so citations line up with printed PDF page labels; expanders also show the raw loader value for debugging.
 - **Tables and figures in PDFs extract poorly.** `pypdf` handles prose well; complex layouts less so. For graphics-heavy PDFs, try `pymupdf` or `unstructured` (not installed by default).
@@ -414,14 +443,23 @@ Swap to the fallback model by changing `CHAT_MODEL` to `"llama3.2:3b"`.
 
 ## Roadmap
 
-Possible directions, in rough priority order:
+Shipped recently: retrieval trace, `diagnose_retrieval.py`, retrieval eval harness (`eval/retrieval_cases.json`, `eval_retrieval.py --compare`).
 
-- **Per-file deduplication via deterministic chunk IDs** — kills the duplicate-on-reingest footgun and makes re-ingest a no-op for unchanged files.
-- **Comparison mode across multiple reports** — per-year / per-source retrieval with merging, for questions like *"How did IEA's view of electrolyser deployment change from 2021 to 2025?"*.
-- **Reranking layer** — cross-encoder rerank of a wide top-N down to a sharp top-K to improve answer quality on broad questions.
-- **Pydantic-typed structured answer outputs** for programmatic consumers downstream.
-- **Simple eval harness** using `eval/test_questions.json` — score retrieval + answer quality empirically rather than by vibe.
+Near-term (retrieval-first):
+
+- **Eval hardening (Phase 3.2)** — refine partial `expected_evidence`, add dominance/duplicate metrics in eval output.
+- **Ranking / selection experiment** — only after eval baseline; avoid blind RRF (single-file dominance observed).
+- **Answer synthesis discipline** — after retrieval selection is measured; k=10 showed drift despite more chunks.
+
+Later:
+
+- **Per-file deduplication via deterministic chunk IDs** — re-ingest without duplicate chunks.
+- **Comparison mode across multiple reports** — per-year / per-source retrieval with merging.
+- **Cross-encoder reranking** — wide retrieve, rerank to sharp top-K.
+- **Pydantic-typed structured answer outputs** for programmatic consumers.
 - **Optional support for** `.docx`, `.xlsx`, `.html`.
+
+See [`GEMINI.md`](GEMINI.md) for agent-oriented priorities and constraints.
 
 ## Acknowledgements
 
