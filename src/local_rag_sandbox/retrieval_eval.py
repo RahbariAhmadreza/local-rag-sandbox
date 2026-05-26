@@ -68,6 +68,8 @@ class RetrievalRunMetrics:
     unique_page_count: int
     evidence_recall: EvidenceRecallResult
     dominant_filename_share: float
+    matched_evidence: tuple[ExpectedEvidence, ...]
+    missed_evidence: tuple[ExpectedEvidence, ...]
 
     @property
     def recall_display(self) -> str:
@@ -221,6 +223,8 @@ def summarize_trace(
         unique_page_count=unique_page_count,
         evidence_recall=evidence_recall,
         dominant_filename_share=dominant_filename_share,
+        matched_evidence=evidence_recall.hit_items,
+        missed_evidence=evidence_recall.missed_items,
     )
 
 
@@ -252,6 +256,27 @@ def format_top_filenames(dist: dict[str, int], limit: int = 2) -> str:
         return "-"
     items = sorted(dist.items(), key=lambda x: (-x[1], x[0]))[:limit]
     return ", ".join(f"{name}({count})" for name, count in items)
+
+
+def format_evidence_item(item: ExpectedEvidence) -> str:
+    return f"{item.filename} p.{item.page}"
+
+
+def format_evidence_list(items: tuple[ExpectedEvidence, ...]) -> str:
+    if not items:
+        return "(none)"
+    return "; ".join(format_evidence_item(item) for item in items)
+
+
+def format_profile_evidence_lines(metrics: RetrievalRunMetrics) -> list[str]:
+    """Matched/missed expected evidence for one profile (empty if no gold labels)."""
+    if not metrics.evidence_recall.total_expected:
+        return []
+    prefix = f"  [{metrics.profile_name}]"
+    return [
+        f"{prefix} matched: {format_evidence_list(metrics.matched_evidence)}",
+        f"{prefix} missed : {format_evidence_list(metrics.missed_evidence)}",
+    ]
 
 
 def format_metrics_table(rows: list[RetrievalRunMetrics]) -> list[str]:

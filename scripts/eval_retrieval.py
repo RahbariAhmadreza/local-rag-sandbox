@@ -43,6 +43,7 @@ from local_rag_sandbox.retrieval_eval import (
     empty_trace_metrics,
     filter_cases,
     format_metrics_table,
+    format_profile_evidence_lines,
     format_top_filenames,
     load_cases,
     summarize_trace,
@@ -227,9 +228,12 @@ def main() -> None:
 
         for line in format_metrics_table(rows):
             print(line)
+        for row in rows:
+            for detail_line in format_profile_evidence_lines(row):
+                print(detail_line)
         if rows:
             top = rows[0]
-            print(f"  top files (k5/first profile): {format_top_filenames(top.filename_distribution)}")
+            print(f"  top files (first profile): {format_top_filenames(top.filename_distribution)}")
         print()
 
     if any_failed:

@@ -13,6 +13,7 @@ from local_rag_sandbox.retrieval_eval import (
     compute_evidence_recall,
     filter_cases,
     format_metrics_table,
+    format_profile_evidence_lines,
     load_cases,
     summarize_trace,
 )
@@ -93,7 +94,90 @@ def test_evidence_recall_partial_hits() -> None:
     )
     result = compute_evidence_recall([_chunk("a.pdf", 1)], expected)
     assert result.format_recall() == "1/2"
-    assert len(result.missed_items) == 1
+    assert result.hit_items == (ExpectedEvidence("a.pdf", 1),)
+    assert result.missed_items == (ExpectedEvidence("b.pdf", 2),)
+
+
+def test_evidence_recall_full_match() -> None:
+    expected = (ExpectedEvidence("a.pdf", 1), ExpectedEvidence("b.pdf", 2))
+    chunks = [_chunk("a.pdf", 1), _chunk("b.pdf", 2)]
+    result = compute_evidence_recall(chunks, expected)
+    assert result.format_recall() == "2/2"
+    assert result.missed_items == ()
+
+
+def test_evidence_recall_no_match() -> None:
+    expected = (ExpectedEvidence("x.pdf", 99),)
+    result = compute_evidence_recall([_chunk("a.pdf", 1)], expected)
+    assert result.format_recall() == "0/1"
+    assert result.hit_items == ()
+    assert result.missed_items == expected
+
+
+def test_summarize_trace_matched_and_missed_evidence() -> None:
+    expected = (
+        ExpectedEvidence("a.pdf", 1),
+        ExpectedEvidence("b.pdf", 2),
+    )
+    metrics = summarize_trace(
+        RetrievalTrace(
+            original_query="q",
+            subquery_results=[],
+            final_chunks=[_chunk("a.pdf", 1)],
+        ),
+        profile_name="k5",
+        subquery_k=5,
+        top_k=20,
+        expected_evidence=expected,
+    )
+    assert metrics.matched_evidence == (ExpectedEvidence("a.pdf", 1),)
+    assert metrics.missed_evidence == (ExpectedEvidence("b.pdf", 2),)
+    assert metrics.recall_display == "1/2"
+
+
+def test_summarize_trace_empty_expected_has_no_matched_missed() -> None:
+    metrics = summarize_trace(
+        RetrievalTrace(original_query="q", subquery_results=[], final_chunks=[_chunk()]),
+        profile_name="k5",
+        subquery_k=5,
+        top_k=20,
+        expected_evidence=(),
+    )
+    assert metrics.matched_evidence == ()
+    assert metrics.missed_evidence == ()
+    assert metrics.recall_display == "n/a"
+
+
+def test_format_profile_evidence_lines() -> None:
+    metrics = summarize_trace(
+        RetrievalTrace(
+            original_query="q",
+            subquery_results=[],
+            final_chunks=[_chunk("a.pdf", 10)],
+        ),
+        profile_name="k10",
+        subquery_k=10,
+        top_k=20,
+        expected_evidence=(
+            ExpectedEvidence("a.pdf", 10),
+            ExpectedEvidence("c.pdf", 30),
+        ),
+    )
+    lines = format_profile_evidence_lines(metrics)
+    assert len(lines) == 2
+    assert "[k10] matched: a.pdf p.10" in lines[0]
+    assert "[k10] missed : c.pdf p.30" in lines[1]
+
+
+def test_format_profile_evidence_lines_empty_when_no_expected() -> None:
+    metrics = summarize_trace(
+        RetrievalTrace(original_query="q", subquery_results=[], final_chunks=[]),
+        profile_name="k5",
+        subquery_k=None,
+        top_k=20,
+        expected_evidence=(),
+    )
+    assert format_profile_evidence_lines(metrics) == []
 
 
 def test_summarize_trace_counts_and_distributions() -> None:

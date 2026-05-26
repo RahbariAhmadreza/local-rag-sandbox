@@ -1,10 +1,11 @@
 {
   "version": 1,
+  "about": "Retrieval eval cases for the current indexed corpus. expected_evidence entries are partial reference pages from manual diagnostics (corpus-specific), intended for regression and debugging—not a complete gold standard. Replace or revise cases when reports change. Recall and other metrics are indicative comparisons between retrieval settings, not absolute quality scores.",
   "cases": [
     {
       "id": "hydrogen_fid_offtake_investment",
       "question": "What investment, offtake, and FID risks do the indexed documents associate with hydrogen projects?",
-      "notes": "Primary regression case from Deep R&D diagnostics. expected_evidence is partial gold only; recall is indicative, not a full benchmark.",
+      "notes": "Primary regression case. expected_evidence lists example DNV/IEA pages observed during diagnostics on this corpus; they are partial reference labels for comparing runs (e.g. subquery-k=5 vs k=10), not tuning targets or universal truths. Update or replace when the index changes.",
       "expected_evidence": [
         {"filename": "2026_eto_hydrogen_forecast.pdf", "page": 8},
         {"filename": "2026_eto_hydrogen_forecast.pdf", "page": 34},
@@ -17,13 +18,13 @@
     {
       "id": "hydrogen_bottlenecks_broad",
       "question": "What were the main hydrogen bottlenecks mentioned across the indexed reports?",
-      "notes": "Broad synthesis question. No gold pages yet; recall will show n/a.",
+      "notes": "Broad synthesis question. expected_evidence is empty until partial reference pages are added for this corpus; recall shows n/a. Same indicative/regression intent as other cases.",
       "expected_evidence": []
     },
     {
       "id": "electrolyser_technologies",
       "question": "What are the main types of electrolyzers covered in the corpus, and how do reports describe their trade-offs?",
-      "notes": "Corpus-wide factual question. expected_evidence may be expanded after manual review.",
+      "notes": "Corpus-wide factual question. expected_evidence may be filled with partial reference pages after manual review; not a complete gold set.",
       "expected_evidence": []
     }
   ]
