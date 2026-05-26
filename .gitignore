@@ -23,4 +23,6 @@ data/*.pdf
 
 PROPOSAL.md
 STATUS.txt
+STATUS.md
 ROADMAP.md
+lessons_learned/
